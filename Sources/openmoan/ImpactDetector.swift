@@ -150,6 +150,11 @@ final class SpankBridgeDetector: ImpactDetector, @unchecked Sendable {
     }
 
     static func locateBinary() -> URL? {
+        if let bundledPath = bundledBinaryPath(),
+           FileManager.default.isExecutableFile(atPath: bundledPath.path) {
+            return bundledPath
+        }
+
         let directPaths = [
             "/opt/homebrew/bin/spank",
             "/usr/local/bin/spank",
@@ -178,5 +183,14 @@ final class SpankBridgeDetector: ImpactDetector, @unchecked Sendable {
         } catch {
             return nil
         }
+    }
+
+    static func isBundledBinary(_ url: URL) -> Bool {
+        guard let bundledPath = bundledBinaryPath() else { return false }
+        return url.standardizedFileURL == bundledPath.standardizedFileURL
+    }
+
+    private static func bundledBinaryPath() -> URL? {
+        Bundle.main.resourceURL?.appendingPathComponent("spank", isDirectory: false)
     }
 }

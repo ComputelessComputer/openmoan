@@ -42,6 +42,8 @@ That script builds a universal binary, wraps it in `OpenMoan.app`, creates a DMG
 
 ## Detection Backend
 
-OpenMoan prefers the `spank` CLI when it is installed and executable on the machine. If `spank` is missing or cannot run, the app falls back to demo mode and the `Test Slap` button drives the response path.
+OpenMoan first looks for a bundled `spank` binary inside the app, then falls back to an installed `spank` CLI on the machine. If neither is available or the detector cannot run, the app falls back to demo mode and the `Preview Test Slap` button drives the response path.
+
+`./scripts/build-release-assets.sh` will bundle `spank` automatically when it is already installed on the release machine. You can also point it at a specific detector binary with `SPANK_BINARY=/path/to/spank ./scripts/build-release-assets.sh <tag> <output-dir>`.
 
 This keeps the app usable while the native hardware detector remains separate from the UI and packaging layer.

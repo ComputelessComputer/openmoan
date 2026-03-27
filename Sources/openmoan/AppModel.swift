@@ -119,7 +119,11 @@ final class AppModel: ObservableObject {
             }
             detector = bridge
             backendLabel = "spank"
-            backendMessage = "Real laptop hits are enabled while the spank backend is running."
+            if SpankBridgeDetector.isBundledBinary(binary) {
+                backendMessage = "Using the bundled spank detector for real laptop hits."
+            } else {
+                backendMessage = "Using the installed spank detector for real laptop hits."
+            }
             supportsLiveImpacts = true
             return
         }
