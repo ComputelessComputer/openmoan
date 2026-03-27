@@ -18,6 +18,10 @@ struct MenuBarView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if !model.supportsLiveImpacts {
+                backendNotice(message: model.backendMessage)
+            }
+
             HStack(spacing: 12) {
                 statCard(label: "Slaps", value: "\(model.slapCount)")
                 statCard(label: "Amp", value: String(format: "%.3fg", model.lastAmplitude))
@@ -25,15 +29,24 @@ struct MenuBarView: View {
             }
 
             VStack(spacing: 8) {
-                Button(model.isListening ? "Stop Listening" : "Start Listening") {
-                    model.toggleListening()
+                if model.supportsLiveImpacts {
+                    Button(model.isListening ? "Stop Listening" : "Start Listening") {
+                        model.toggleListening()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.borderedProminent)
 
-                Button("Test Slap") {
-                    model.triggerTestSlap()
+                if model.supportsLiveImpacts {
+                    Button("Test Slap") {
+                        model.triggerTestSlap()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Button("Preview Test Slap") {
+                        model.triggerTestSlap()
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                .buttonStyle(.bordered)
             }
 
             Divider()
@@ -67,5 +80,20 @@ struct MenuBarView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func backendNotice(message: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Real slap detection is off", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
     }
 }

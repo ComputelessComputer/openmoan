@@ -28,6 +28,19 @@ struct SettingsView: View {
 
             Section("Detection") {
                 VStack(alignment: .leading, spacing: 6) {
+                    Label(
+                        model.supportsLiveImpacts ? "Real slap detection is available." : "Demo preview only.",
+                        systemImage: model.supportsLiveImpacts ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(model.supportsLiveImpacts ? .green : .orange)
+
+                    Text(model.backendMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Minimum Amplitude")
                         Spacer()
@@ -46,11 +59,6 @@ struct SettingsView: View {
                     }
                     Slider(value: $model.cooldownMs, in: 150...1500, step: 50)
                 }
-
-                Text("If `spank` is installed, OpenMoan will try to use it. Otherwise the app stays in demo mode and the Test Slap button drives the preview.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section("Menu Bar") {

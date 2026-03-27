@@ -35,7 +35,9 @@ final class AppModel: ObservableObject {
     @Published var soundPack: SoundPack {
         didSet { defaults.set(soundPack.rawValue, forKey: Keys.soundPack) }
     }
-    @Published var backendLabel = "Demo"
+    @Published private(set) var backendLabel = "Demo Preview"
+    @Published private(set) var backendMessage = "Checking detector..."
+    @Published private(set) var supportsLiveImpacts = false
     @Published var lastAmplitude: Double = 0
     @Published var lastSeverity = "idle"
 
@@ -117,6 +119,8 @@ final class AppModel: ObservableObject {
             }
             detector = bridge
             backendLabel = "spank"
+            backendMessage = "Real laptop hits are enabled while the spank backend is running."
+            supportsLiveImpacts = true
             return
         }
 
@@ -132,7 +136,9 @@ final class AppModel: ObservableObject {
             }
         }
         detector = demo
-        backendLabel = "demo"
+        backendLabel = "Demo Preview"
+        backendMessage = "Install spank to react to real laptop hits. Until then, only Preview Test Slap works."
+        supportsLiveImpacts = false
     }
 
     private func restartDetector() {

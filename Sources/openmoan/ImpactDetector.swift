@@ -23,11 +23,11 @@ final class DemoDetector: ImpactDetector, @unchecked Sendable {
     var onStatus: (@Sendable (String) -> Void)?
 
     func start(settings: DetectorSettings) {
-        onStatus?("Demo backend active. Use Test Slap to preview responses.")
+        onStatus?("Demo preview only. Install spank for real laptop hit detection. Use Preview Test Slap to verify responses.")
     }
 
     func stop() {
-        onStatus?("Demo backend stopped")
+        onStatus?("Demo preview stopped")
     }
 }
 
