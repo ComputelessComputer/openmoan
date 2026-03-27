@@ -132,14 +132,31 @@ jobs:
           ZIP_PATH="$RUNNER_TEMP/${APP_NAME}.zip"
           ditto -c -k --keepParent "${{ steps.meta.outputs.app_path }}" "$ZIP_PATH"
 
-          xcrun notarytool submit "$ZIP_PATH" \
+          SUBMIT_OUTPUT="$(xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1)"
+          echo "$SUBMIT_OUTPUT"
+
+          if echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
+            SUBMISSION_ID="$(echo "$SUBMIT_OUTPUT" | grep 'id:' | head -1 | awk '{print $2}')"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID"
+            exit 1
+          fi
 
           xcrun stapler staple "${{ steps.meta.outputs.app_path }}"
           spctl -a -vv -t exec "${{ steps.meta.outputs.app_path }}"
+
+      - name: Create DMG from notarized app
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./scripts/create-dmg.sh
+          ./scripts/create-dmg.sh "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.app_path }}" ./dist
 
       - name: Sign DMG
         shell: bash
@@ -161,11 +178,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          xcrun notarytool submit "${{ steps.meta.outputs.dmg_path }}" \
+          SUBMIT_OUTPUT="$(xcrun notarytool submit "${{ steps.meta.outputs.dmg_path }}" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait
+            --wait 2>&1)"
+          echo "$SUBMIT_OUTPUT"
+
+          if echo "$SUBMIT_OUTPUT" | grep -q "status: Invalid"; then
+            SUBMISSION_ID="$(echo "$SUBMIT_OUTPUT" | grep 'id:' | head -1 | awk '{print $2}')"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID"
+            exit 1
+          fi
 
           xcrun stapler staple "${{ steps.meta.outputs.dmg_path }}"
           xcrun stapler validate "${{ steps.meta.outputs.dmg_path }}"
