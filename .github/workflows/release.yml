@@ -18,11 +18,65 @@ jobs:
     runs-on: macos-latest
     env:
       APP_NAME: OpenMoan
+      APP_BUNDLE: OpenMoan.app
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Import certificate
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          CERT_PATH="$RUNNER_TEMP/certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o "$CERT_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      - name: Resolve signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"$/\1/')"
+
+          if [[ -z "$IDENTITY" ]]; then
+            echo "Developer ID Application identity not found"
+            exit 1
+          fi
+
+          echo "SIGNING_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
 
       - name: Resolve release tag
         id: meta
@@ -42,6 +96,8 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "dmg=${dmg}" >> "$GITHUB_OUTPUT"
           echo "checksum=${checksum}" >> "$GITHUB_OUTPUT"
+          echo "app_path=dist/${APP_BUNDLE}" >> "$GITHUB_OUTPUT"
+          echo "dmg_path=dist/${dmg}" >> "$GITHUB_OUTPUT"
 
       - name: Build DMG assets
         shell: bash
@@ -49,6 +105,70 @@ jobs:
           set -euo pipefail
           chmod +x ./scripts/build-release-assets.sh
           ./scripts/build-release-assets.sh "${{ steps.meta.outputs.tag }}" ./dist
+
+      - name: Sign app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" \
+            --options runtime \
+            --timestamp \
+            --deep \
+            --verbose \
+            "${{ steps.meta.outputs.app_path }}"
+
+          codesign --verify --strict --deep --verbose=4 "${{ steps.meta.outputs.app_path }}"
+
+      - name: Notarize and staple app bundle
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          ZIP_PATH="$RUNNER_TEMP/${APP_NAME}.zip"
+          ditto -c -k --keepParent "${{ steps.meta.outputs.app_path }}" "$ZIP_PATH"
+
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "${{ steps.meta.outputs.app_path }}"
+          spctl -a -vv -t exec "${{ steps.meta.outputs.app_path }}"
+
+      - name: Sign DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" \
+            --timestamp \
+            "${{ steps.meta.outputs.dmg_path }}"
+
+          codesign --verify --verbose=4 "${{ steps.meta.outputs.dmg_path }}"
+
+      - name: Notarize and staple DMG
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+
+          xcrun notarytool submit "${{ steps.meta.outputs.dmg_path }}" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+
+          xcrun stapler staple "${{ steps.meta.outputs.dmg_path }}"
+          xcrun stapler validate "${{ steps.meta.outputs.dmg_path }}"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v7
