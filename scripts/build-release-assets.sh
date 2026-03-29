@@ -32,6 +32,11 @@ if [[ -z "$SPANK_SOURCE" ]] && command -v spank >/dev/null 2>&1; then
   SPANK_SOURCE="$(command -v spank)"
 fi
 
+if [[ -z "$SPANK_SOURCE" ]]; then
+  echo "spank not found locally, fetching from GitHub..."
+  SPANK_SOURCE="$("$ROOT_DIR/scripts/fetch-spank.sh" "$ROOT_DIR/.build/spank")"
+fi
+
 if [[ -n "$SPANK_SOURCE" ]]; then
   if [[ ! -x "$SPANK_SOURCE" ]]; then
     echo "Configured spank binary is not executable: $SPANK_SOURCE" >&2

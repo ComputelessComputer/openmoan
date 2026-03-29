@@ -155,11 +155,14 @@ final class SpankBridgeDetector: ImpactDetector, @unchecked Sendable {
             return bundledPath
         }
 
-        let directPaths = [
+        var directPaths = [
             "/opt/homebrew/bin/spank",
             "/usr/local/bin/spank",
             "/usr/bin/spank",
         ]
+        if let home = ProcessInfo.processInfo.environment["HOME"] {
+            directPaths.insert("\(home)/go/bin/spank", at: 0)
+        }
 
         for path in directPaths where FileManager.default.isExecutableFile(atPath: path) {
             return URL(fileURLWithPath: path)
